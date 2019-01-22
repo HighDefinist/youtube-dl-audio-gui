@@ -4,8 +4,7 @@
 ### Requirements
  
 - Windows
-- Visual Studio 2017
-- [CMake](https://cmake.org/)
+- Visual Studio 2017 with CMake
 
 ### Download 
 
