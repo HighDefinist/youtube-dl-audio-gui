@@ -191,7 +191,7 @@ void DoMainWindow(HWND hwnd) {
     ImGui::Text("Playlist-ID: %s", ListID.c_str());
 
     if (ImGui::Button("Download single")) {
-      if (VideoID!="") Actions.emplace_back(MakeAction(hwnd, ystr("youtube-dl.exe --audio-format best -x -i -o '%%(title)s.%%(ext)s' https://www.youtube.com/watch?v=%", VideoID)));
+      if (VideoID!="") Actions.emplace_back(MakeAction(hwnd, ystr("youtube-dl.exe --audio-format best -x -i -o ""%%(title)s.%%(ext)s"" https://www.youtube.com/watch?v=%", VideoID)));
     }
     ImGui::SameLine();
     if (ImGui::Button("Download playlist")) {
