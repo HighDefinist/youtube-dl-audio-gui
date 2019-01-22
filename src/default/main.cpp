@@ -24,7 +24,6 @@ static ID3D11Device*            g_pd3dDevice = NULL;
 static ID3D11DeviceContext*     g_pd3dDeviceContext = NULL;
 static IDXGISwapChain*          g_pSwapChain = NULL;
 static ID3D11RenderTargetView*  g_mainRenderTargetView = NULL;
-static HWND hwndNextViewer = NULL;
 
 regex regVideoID("v=(.*?)&");
 regex regPlaylistID("list=(.*?)&");
@@ -89,18 +88,8 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
 
   switch (msg) {
-  case WM_CREATE:
-    hwndNextViewer = SetClipboardViewer(hWnd);
-    return 0;
-  case WM_DRAWCLIPBOARD:
-    if (hwndNextViewer) SendMessage(hwndNextViewer, msg, wParam, lParam);
-    InvalidateRect(hWnd, NULL, TRUE);
-    return 0;
-  case WM_CHANGECBCHAIN:
-    if ((HWND)wParam==hwndNextViewer)
-      hwndNextViewer = (HWND)lParam;
-    else if (hwndNextViewer!=NULL)
-      SendMessage(hwndNextViewer, msg, wParam, lParam);
+  case WM_CREATE: 
+    AddClipboardFormatListener(hWnd);
     return 0;
   case WM_SIZE:
     if (g_pd3dDevice!=NULL&&wParam!=SIZE_MINIMIZED) {
@@ -114,7 +103,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
       return 0;
     break;
   case WM_DESTROY:
-    ChangeClipboardChain(hWnd, hwndNextViewer);
+    RemoveClipboardFormatListener(hWnd);
     PostQuitMessage(0);
     return 0;
   }
