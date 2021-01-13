@@ -198,7 +198,7 @@ int main(int, char **) {
     }
     return 0;
   });
-  ImDx.Init("youtube-dl-audio-gui", 100, 100, 600, 232);
+  ImDx.Init("youtube-dl-audio-gui", 100, 100, 300, 188);
 
   while (!ImDx.ProcessMessagesAndCheckIfQuit(false)) {
     ImDx.NewFrame();

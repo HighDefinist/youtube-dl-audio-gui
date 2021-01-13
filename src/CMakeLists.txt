@@ -9,5 +9,5 @@ add_executable(youtube-dl-audio-gui
   ../ext/imgui/imgui_impl_win32.cpp
   ../ext/imgui/imgui_widgets.cpp
 )
-target_link_libraries(youtube-dl-audio-gui d3d11.lib d3dcompiler.lib dxgi.lib imm32.lib)
+target_link_libraries(youtube-dl-audio-gui d3d11.lib d3dcompiler.lib dxgi.lib imm32.lib Shcore.lib)
 target_compile_features(youtube-dl-audio-gui INTERFACE cxx_std_11)

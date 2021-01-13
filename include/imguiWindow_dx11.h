@@ -8,20 +8,21 @@
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <tchar.h>
+#include "shellscalingapi.h"
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 class TImGuiWindowDX11:public TImGuiWindow {
-  ID3D11Device*            g_pd3dDevice = NULL;
-  ID3D11DeviceContext*     g_pd3dDeviceContext = NULL;
-  IDXGISwapChain*          g_pSwapChain = NULL;
-  ID3D11RenderTargetView*  g_mainRenderTargetView = NULL;
+  ID3D11Device *g_pd3dDevice = NULL;
+  ID3D11DeviceContext *g_pd3dDeviceContext = NULL;
+  IDXGISwapChain *g_pSwapChain = NULL;
+  ID3D11RenderTargetView *g_mainRenderTargetView = NULL;
   HWND hWndGUI;
   WNDCLASSEX wc;
 
   void CreateRenderTarget() {
-    ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+    ID3D11Texture2D *pBackBuffer;
+    g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID *)&pBackBuffer);
     g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
     pBackBuffer->Release();
   }
@@ -55,7 +56,7 @@ class TImGuiWindowDX11:public TImGuiWindow {
     UINT createDeviceFlags = 0;
     //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
     D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[2] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0,};
+    const D3D_FEATURE_LEVEL featureLevelArray[2] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
     if (D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext)!=S_OK)
       return E_FAIL;
 
@@ -90,6 +91,22 @@ class TImGuiWindowDX11:public TImGuiWindow {
     case WM_DESTROY:
       PostQuitMessage(0);
       return 0;
+    case WM_DPICHANGED:
+      auto g_dpi = HIWORD(wParam);
+      float xscale = g_dpi/96.f;
+      bRescaleWanted = true;
+      RescaleRelative = xscale/scaleLast;
+      RescaleAbsolute = xscale;
+      scaleLast = xscale;
+      RECT *const prcNewWindow = (RECT *)lParam;
+      SetWindowPos(hWndLoc,
+        NULL,
+        prcNewWindow->left,
+        prcNewWindow->top,
+        prcNewWindow->right-prcNewWindow->left,
+        prcNewWindow->bottom-prcNewWindow->top,
+        SWP_NOZORDER|SWP_NOACTIVATE);
+      return 0;
     }
     return DefWindowProc(hWndLoc, msg, wParam, lParam);
   }
@@ -98,7 +115,7 @@ class TImGuiWindowDX11:public TImGuiWindow {
     TImGuiWindowDX11 *pThis;
 
     if (msg==WM_NCCREATE) {
-      pThis = static_cast<TImGuiWindowDX11*>(reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams);
+      pThis = static_cast<TImGuiWindowDX11 *>(reinterpret_cast<CREATESTRUCT *>(lParam)->lpCreateParams);
 
       SetLastError(0);
       if (!SetWindowLongPtr(hWndLoc, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pThis))) {
@@ -106,7 +123,7 @@ class TImGuiWindowDX11:public TImGuiWindow {
           return FALSE;
       }
     } else {
-      pThis = reinterpret_cast<TImGuiWindowDX11*>(GetWindowLongPtr(hWndLoc, GWLP_USERDATA));
+      pThis = reinterpret_cast<TImGuiWindowDX11 *>(GetWindowLongPtr(hWndLoc, GWLP_USERDATA));
     }
 
     if (pThis) {
@@ -115,10 +132,42 @@ class TImGuiWindowDX11:public TImGuiWindow {
     } else return DefWindowProc(hWndLoc, msg, wParam, lParam);
   }
 
+  void ImGui_ApplyRescale() {
+    auto &io = ImGui::GetIO();
+
+    float NewScale = 16.0f*RescaleAbsolute;
+    io.FontDefault = [&] {
+      for (auto xFont:io.Fonts->Fonts) {
+        if (xFont->FontSize==NewScale) {
+          return xFont;
+        }
+      }
+      auto temp = io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/Verdana.ttf", NewScale);
+      ImGui_ImplDX11_CreateDeviceObjects();
+      return temp;
+    }();
+    ImGui::GetStyle() = ImGuiStyle();
+    ImGui::GetStyle().ScaleAllSizes(RescaleAbsolute);
+    //for (auto *xWindow:GImGui->Windows) {
+    //  xWindow->Pos.x = roundf(xWindow->Pos.x*RescaleRelative);
+    //  xWindow->Pos.y = roundf(xWindow->Pos.y*RescaleRelative);
+    //  xWindow->Size.x = roundf(xWindow->Size.x*RescaleRelative);
+    //  xWindow->Size.y = roundf(xWindow->Size.y*RescaleRelative);
+    //  xWindow->SizeFull.x = roundf(xWindow->SizeFull.x*RescaleRelative);
+    //  xWindow->SizeFull.y = roundf(xWindow->SizeFull.y*RescaleRelative);
+    //}
+  }
+
+  bool  bRescaleWanted = false;
+  float scaleLast = 1;
+  float RescaleRelative;
+  float RescaleAbsolute;
+
 public:
   virtual bool Init(std::string WindowName, int x, int y, int xSz, int ySz) override {
-    // Create application window
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
 
+    // Create application window
     wc = {sizeof(WNDCLASSEX), CS_CLASSDC, WndProcStatic, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, _T(WindowName.c_str()), NULL};
     RegisterClassEx(&wc);
     hWndGUI = CreateWindow(wc.lpszClassName, _T(WindowName.c_str()), WS_OVERLAPPEDWINDOW, x, y, xSz, ySz, NULL, NULL, wc.hInstance, this);
@@ -137,10 +186,26 @@ public:
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-    io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Verdana.ttf", 24.0f);
-    ImGui::GetStyle().ScaleAllSizes(1.5);
+
+    // Resize window and window elements to the DPI of the monitor
+    HMONITOR monitor = MonitorFromWindow(hWndGUI, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info;
+    info.cbSize = sizeof(MONITORINFO);
+    UINT newDpiX, newDpiY;
+    GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &newDpiX, &newDpiY);
+    float xScaleTemp = newDpiX/96.f;
+    scaleLast = RescaleRelative = RescaleAbsolute = xScaleTemp;
+    SetWindowPos(hWndGUI,
+      NULL,
+      x,
+      y,
+      (int)round(xSz*xScaleTemp),
+      (int)round(ySz*xScaleTemp),
+      SWP_NOZORDER|SWP_NOACTIVATE);
+    io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/Verdana.ttf", 16.0f*RescaleAbsolute);
+    ImGui::GetStyle().ScaleAllSizes(RescaleAbsolute);
 
     // Setup Platform/Renderer bindings
     ImGui_ImplWin32_Init(hWndGUI);
@@ -154,11 +219,15 @@ public:
       if (GetMessage(&msg, NULL, 0U, 0U)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
-        if (msg.message==WM_QUIT) return true;
+        if (msg.message==WM_QUIT) {
+          return true;
+        }
         while (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
           TranslateMessage(&msg);
           DispatchMessage(&msg);
-          if (msg.message==WM_QUIT) return true;
+          if (msg.message==WM_QUIT) {
+            return true;
+          }
         }
       }
     } else {
@@ -169,6 +238,9 @@ public:
       auto locWindow = GetWindowLocation();
       if (locWindow.xSz==0&&locWindow.ySz==0) {
         Sleep(50);
+      }
+      if (locWindow.xSz==-1&&locWindow.ySz==-1) {
+        return true;
       }
     }
     return false;
@@ -183,14 +255,22 @@ public:
     UnregisterClass(wc.lpszClassName, wc.hInstance);
   }
   void NewFrame() override {
+    if (bRescaleWanted) {
+      ImGui_ApplyRescale();
+      bRescaleWanted = false;
+    }
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
   }
   TRect GetWindowLocation() override {
     RECT WindowLoc;
-    GetClientRect(hWndGUI, &WindowLoc);
-    return TRect{WindowLoc.left,WindowLoc.top,WindowLoc.right-WindowLoc.left,WindowLoc.bottom-WindowLoc.top};
+    auto isWindow = GetClientRect(hWndGUI, &WindowLoc);
+    if (isWindow) {
+      return TRect{WindowLoc.left, WindowLoc.top, WindowLoc.right-WindowLoc.left, WindowLoc.bottom-WindowLoc.top};
+    } else {
+      return TRect{-1,-1,-1,-1};
+    }
   }
   void ScheduleRedraw() override {
     InvalidateRect(hWndGUI, NULL, TRUE);
@@ -200,7 +280,7 @@ public:
     g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
     if (ClearAll) {
       ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);
-      g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, (float*)&clear_color);
+      g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, (float *)&clear_color);
     }
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
