@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.1)
 
-add_executable(default 
+add_executable(youtube-dl-audio-gui 
   default/main.cpp
   ../ext/imgui/imgui.cpp 
   ../ext/imgui/imgui_demo.cpp
@@ -9,5 +9,5 @@ add_executable(default
   ../ext/imgui/imgui_impl_win32.cpp
   ../ext/imgui/imgui_widgets.cpp
 )
-target_link_libraries(default d3d11.lib d3dcompiler.lib dxgi.lib imm32.lib)
-target_compile_features(default INTERFACE cxx_std_11)
+target_link_libraries(youtube-dl-audio-gui d3d11.lib d3dcompiler.lib dxgi.lib imm32.lib)
+target_compile_features(youtube-dl-audio-gui INTERFACE cxx_std_11)
