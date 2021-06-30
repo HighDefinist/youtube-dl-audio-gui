@@ -32,6 +32,9 @@
 *.app
 
 # Misc
+/.cmake
 /.vs
-/build
 /.vscode
+/build
+/out
+CMakeSettings.json
